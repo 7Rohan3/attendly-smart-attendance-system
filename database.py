@@ -17,6 +17,9 @@ class _HybridRow(dict):
 
 
 def _hybrid_row(cursor):
+    # PostgreSQL DDL and other commands have no result columns.
+    if cursor.description is None:
+        return lambda values: values
     names = [column.name for column in cursor.description]
     return lambda values: _HybridRow(zip(names, values))
 
