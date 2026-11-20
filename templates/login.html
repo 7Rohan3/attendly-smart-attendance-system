@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7f5"><title>Admin sign in | Attendly</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-card content-card">
+    <a class="brand login-brand" href="{{ url_for('login') }}"><span class="brand-mark">A</span><span>attendly</span></a>
+    <p class="eyebrow">ADMIN WORKSPACE</p><h1>Sign in</h1><p class="muted">Sign in to manage students and attendance records.</p>
+    {% if error %}<p class="message message-error">{{ error }}</p>{% endif %}
+    <form method="post" action="{{ url_for('login_submit', next=request.args.get('next', '')) }}">
+      <label for="username">Username</label><input id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="button button-primary button-full" type="submit">Sign in <span>→</span></button>
+    </form>
+    <p class="privacy-note">For local demonstration, configure your administrator credentials using environment variables before sharing or deploying the application.</p>
+  </main>
+</body>
+</html>

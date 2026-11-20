@@ -1,0 +1,144 @@
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timedelta
+from pathlib import Path
+
+
+@contextmanager
+def _connect(database_path):
+    connection = sqlite3.connect(database_path, timeout=10)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def init_database(database_path):
+    """Create new tables and additive columns; never replaces an existing database."""
+    Path(database_path).parent.mkdir(parents=True, exist_ok=True)
+    with _connect(database_path) as db:
+        db.executescript("""
+        CREATE TABLE IF NOT EXISTS students (
+            student_id TEXT PRIMARY KEY, full_name TEXT NOT NULL,
+            face_encoding BLOB NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL REFERENCES students(student_id) ON DELETE RESTRICT,
+            attended_at TEXT NOT NULL, attendance_date TEXT NOT NULL,
+            UNIQUE(student_id, attendance_date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(attendance_date);
+        CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance(student_id, attendance_date);
+        CREATE TABLE IF NOT EXISTS recognition_trials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            expected_identity TEXT, predicted_identity TEXT, condition TEXT NOT NULL,
+            lighting TEXT NOT NULL DEFAULT '', distance TEXT NOT NULL DEFAULT '',
+            orientation TEXT NOT NULL DEFAULT '', result TEXT NOT NULL,
+            processing_ms REAL NOT NULL, trial_type TEXT NOT NULL DEFAULT 'identification',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_trials_condition ON recognition_trials(condition);
+        """)
+        columns = {r[1] for r in db.execute("PRAGMA table_info(students)")}
+        for name, sql in (("email", "TEXT"), ("department", "TEXT NOT NULL DEFAULT ''"),
+                          ("is_active", "INTEGER NOT NULL DEFAULT 1")):
+            if name not in columns:
+                db.execute(f"ALTER TABLE students ADD COLUMN {name} {sql}")
+
+
+def student_exists(path, student_id):
+    with _connect(path) as db:
+        return db.execute("SELECT 1 FROM students WHERE student_id=?", (student_id,)).fetchone() is not None
+
+
+def add_student(path, student_id, full_name, face_encoding, email="", department=""):
+    try:
+        with _connect(path) as db:
+            db.execute("INSERT INTO students(student_id,full_name,face_encoding,email,department) VALUES(?,?,?,?,?)",
+                       (student_id, full_name, face_encoding.tobytes(), email or None, department))
+    except sqlite3.IntegrityError as error:
+        raise ValueError("Student ID is already registered.") from error
+
+
+def get_student_encodings(path):
+    import numpy as np
+    with _connect(path) as db:
+        rows = db.execute("SELECT student_id,full_name,face_encoding FROM students WHERE is_active=1 ORDER BY full_name").fetchall()
+    return [(r["student_id"], r["full_name"], np.frombuffer(r["face_encoding"], dtype=np.float64)) for r in rows]
+
+
+def get_students(path, query=""):
+    with _connect(path) as db:
+        rows = db.execute("""SELECT student_id,full_name,email,department,is_active,
+            date(created_at) registered_date FROM students WHERE (?='' OR student_id LIKE ? OR full_name LIKE ?)
+            ORDER BY is_active DESC,full_name COLLATE NOCASE""", (query, f"%{query}%", f"%{query}%")).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_student(path, student_id, full_name, email, department):
+    with _connect(path) as db:
+        cur = db.execute("UPDATE students SET full_name=?,email=?,department=? WHERE student_id=?",
+                         (full_name, email or None, department, student_id))
+        return cur.rowcount > 0
+
+
+def deactivate_student(path, student_id):
+    with _connect(path) as db:
+        cur = db.execute("UPDATE students SET is_active=0 WHERE student_id=?", (student_id,))
+        return cur.rowcount > 0
+
+
+def add_attendance(path, student_id, now=None):
+    timestamp = now or datetime.now()
+    date = timestamp.date().isoformat()
+    try:
+        with _connect(path) as db:
+            db.execute("INSERT INTO attendance(student_id,attended_at,attendance_date) VALUES(?,?,?)",
+                       (student_id, timestamp.isoformat(timespec="seconds"), date))
+    except sqlite3.IntegrityError as error:
+        raise ValueError("Attendance is already recorded for today.") from error
+    return {"date": date, "time": timestamp.strftime("%H:%M:%S")}
+
+
+def get_attendance(path, query="", start_date="", end_date="", department="", status=""):
+    with _connect(path) as db:
+        rows = db.execute("""SELECT a.attendance_date date,strftime('%H:%M:%S',a.attended_at) time,
+            s.student_id,s.full_name,s.department,'Present' status FROM attendance a JOIN students s USING(student_id)
+            WHERE (?='' OR s.student_id LIKE ? OR s.full_name LIKE ?) AND (?='' OR a.attendance_date>=?)
+            AND (?='' OR a.attendance_date<=?) AND (?='' OR s.department=?)
+            AND (?='' OR ?='Present') ORDER BY a.attended_at DESC,s.full_name COLLATE NOCASE""",
+            (query,f"%{query}%",f"%{query}%",start_date,start_date,end_date,end_date,department,department,status,status)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_dashboard_data(path):
+    today = datetime.now().date().isoformat()
+    with _connect(path) as db:
+        total = db.execute("SELECT COUNT(*) FROM students WHERE is_active=1").fetchone()[0]
+        present = db.execute("SELECT COUNT(*) FROM attendance a JOIN students s USING(student_id) WHERE attendance_date=? AND s.is_active=1", (today,)).fetchone()[0]
+        records_count = db.execute("SELECT COUNT(*) FROM attendance").fetchone()[0]
+        recent = db.execute("SELECT a.attendance_date date,strftime('%H:%M:%S',a.attended_at) time,s.student_id,s.full_name FROM attendance a JOIN students s USING(student_id) ORDER BY a.attended_at DESC LIMIT 5").fetchall()
+        weekly = db.execute("SELECT attendance_date day,COUNT(*) count FROM attendance WHERE attendance_date>=? GROUP BY attendance_date ORDER BY attendance_date", ((datetime.now().date()-timedelta(days=6)).isoformat(),)).fetchall()
+        monthly = db.execute("SELECT substr(attendance_date,1,7) month,COUNT(*) count FROM attendance WHERE attendance_date>=? GROUP BY month ORDER BY month", ((datetime.now().date()-timedelta(days=180)).isoformat(),)).fetchall()
+    rate = round(present * 100 / total, 1) if total else 0.0
+    return {"student_count":total,"today_count":present,"absent_count":max(0,total-present),"attendance_rate":rate,
+            "attendance_records_count":records_count,"recent_records":[dict(r) for r in recent],
+            "weekly_trend":[dict(r) for r in weekly],"monthly_trend":[dict(r) for r in monthly]}
+
+
+def add_trial(path, values):
+    with _connect(path) as db:
+        db.execute("""INSERT INTO recognition_trials(expected_identity,predicted_identity,condition,lighting,distance,orientation,result,processing_ms,trial_type)
+            VALUES(?,?,?,?,?,?,?,?,?)""", values)
+
+
+def get_trials(path):
+    with _connect(path) as db:
+        return [dict(r) for r in db.execute("SELECT * FROM recognition_trials ORDER BY created_at DESC,id DESC")]

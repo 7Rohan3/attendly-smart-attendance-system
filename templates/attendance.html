@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Take attendance{% endblock %}
+{% block content %}
+<section class="page-heading centered-heading">
+  <p class="eyebrow">QUICK CHECK-IN</p>
+  <h1>Take attendance</h1>
+  <p class="muted">Look at the camera, then capture a clear photo to check in.</p>
+</section>
+<section class="attendance-panel content-card">
+  <div class="camera-box attendance-camera">
+    <video id="camera" autoplay playsinline muted aria-label="Camera preview"></video>
+    <canvas id="capture-canvas" hidden></canvas>
+    <div id="camera-placeholder" class="camera-placeholder"><span>◉</span><strong>Camera preview</strong><small>Allow camera access to get started.</small></div>
+    <div class="face-guide" aria-hidden="true"></div>
+  </div>
+  <div class="attendance-controls">
+    <label class="camera-picker" for="camera-select" hidden>
+      <span>Camera</span>
+      <select id="camera-select" aria-label="Choose a camera"></select>
+    </label>
+    <button type="button" id="switch-camera" class="button button-secondary">↻ Switch camera</button>
+    <button type="button" id="capture-attendance" class="button button-primary">◎ Capture &amp; check in</button>
+  </div>
+  <div id="attendance-message" class="result-message" role="status" aria-live="polite">
+    <span class="result-symbol">◎</span><span>Position your face in the frame.</span>
+  </div>
+  <p class="privacy-note centered">Your image is processed for recognition and immediately discarded. Distance is a model score, not a probability or confidence percentage.</p>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/camera-access.js') }}" defer></script><script src="{{ url_for('static', filename='js/attendance.js') }}" defer></script>{% endblock %}

@@ -1,0 +1,11 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+attendance.db
+known-faces/
+*.sqlite
+*.sqlite3
+attendly-server.log
+attendly-server-error.log

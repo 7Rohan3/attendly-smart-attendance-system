@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7f5">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Smart Attendance{% endblock %} | Attendly</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}" aria-label="Attendly home">
+      <span class="brand-mark">A</span><span>attendly</span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a class="{{ 'active' if request.endpoint == 'index' else '' }}" href="{{ url_for('index') }}">Overview</a>
+      <a class="{{ 'active' if request.endpoint == 'register_page' else '' }}" href="{{ url_for('register_page') }}">Students</a>
+      <a class="{{ 'active' if request.endpoint == 'attendance_page' else '' }}" href="{{ url_for('attendance_page') }}">Take attendance</a>
+      <a class="{{ 'active' if request.endpoint == 'records_page' else '' }}" href="{{ url_for('records_page') }}">Records</a>
+      <a class="{{ 'active' if request.endpoint == 'research_page' else '' }}" href="{{ url_for('research_page') }}">Research Evaluation</a>
+    </nav>
+    <div class="topbar-actions">
+      <span class="today-label">{{ now().strftime('%a, %b') }} {{ now().day }}</span>
+      {% if session.get('admin_authenticated') %}<form action="{{ url_for('logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-button" type="submit">Sign out</button></form>{% endif %}
+    </div>
+  </header>
+  <main class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">Smart attendance, made simple <span>·</span> Your camera images are processed and not saved.</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
