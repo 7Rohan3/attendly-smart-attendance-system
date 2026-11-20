@@ -216,8 +216,8 @@ def get_dashboard_data(path):
         present = db.execute("SELECT COUNT(*) FROM attendance a JOIN students s USING(student_id) WHERE attendance_date=? AND s.is_active=1", (today,)).fetchone()[0]
         records_count = db.execute("SELECT COUNT(*) FROM attendance").fetchone()[0]
         recent = db.execute(f"SELECT a.attendance_date date,{time_expr} time,s.student_id,s.full_name FROM attendance a JOIN students s USING(student_id) ORDER BY a.attended_at DESC LIMIT 5").fetchall()
-        weekly = db.execute("SELECT attendance_date day,COUNT(*) count FROM attendance WHERE attendance_date>=? GROUP BY attendance_date ORDER BY attendance_date", ((datetime.now().date()-timedelta(days=6)).isoformat(),)).fetchall()
-        monthly = db.execute("SELECT substr(attendance_date,1,7) month,COUNT(*) count FROM attendance WHERE attendance_date>=? GROUP BY month ORDER BY month", ((datetime.now().date()-timedelta(days=180)).isoformat(),)).fetchall()
+        weekly = db.execute('SELECT attendance_date AS "day",COUNT(*) AS "count" FROM attendance WHERE attendance_date>=? GROUP BY attendance_date ORDER BY attendance_date', ((datetime.now().date()-timedelta(days=6)).isoformat(),)).fetchall()
+        monthly = db.execute('SELECT substr(attendance_date,1,7) AS "month",COUNT(*) AS "count" FROM attendance WHERE attendance_date>=? GROUP BY "month" ORDER BY "month"', ((datetime.now().date()-timedelta(days=180)).isoformat(),)).fetchall()
     rate = round(present * 100 / total, 1) if total else 0.0
     return {"student_count":total,"today_count":present,"absent_count":max(0,total-present),"attendance_rate":rate,
             "attendance_records_count":records_count,"recent_records":[dict(r) for r in recent],
