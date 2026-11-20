@@ -1,3 +1,4 @@
+setuptools>=68,<81
 Flask>=3.0,<4
 Werkzeug>=3.0,<4
 dlib-bin==20.0.1.post1
