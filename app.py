@@ -38,7 +38,7 @@ def _research_metrics(rows):
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(SECRET_KEY=os.environ.get("SECRET_KEY") or secrets.token_hex(32),
-        DATABASE=os.environ.get("ATTENDANCE_DATABASE",str(Path(app.root_path)/"attendance.db")),
+        DATABASE=os.environ.get("DATABASE_URL") or os.environ.get("ATTENDANCE_DATABASE",str(Path(app.root_path)/"attendance.db")),
         MAX_CONTENT_LENGTH=5*1024*1024, FACE_MATCH_THRESHOLD=float(os.environ.get("FACE_MATCH_THRESHOLD","0.48")),
         ADMIN_USERNAME=os.environ.get("ADMIN_USERNAME"), ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD"),
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE","0")=="1")

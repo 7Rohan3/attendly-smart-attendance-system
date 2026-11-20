@@ -35,6 +35,12 @@ $env:SECRET_KEY = python -c "import secrets; print(secrets.token_urlsafe(48))"
 python app.py
 ```
 
+## Deploy to Vercel
+
+The Flask app can run as a Vercel Function, but serverless files are not persistent. Configure a managed PostgreSQL database and set `DATABASE_URL` in Vercel's Environment Variables before deploying. Attendly stores face encodings and attendance records in that database. Do not upload or deploy a local `attendance.db`; it is ignored by Git. The deployed app also requires `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and a long random `SECRET_KEY`. Use HTTPS (provided by Vercel) and keep these values private.
+
+The Vercel deployment serves the browser assets from `public/static`; those files mirror the local `static` assets because Vercel serves public assets through its CDN. When changing CSS or JavaScript, update both locations.
+
 Open http://127.0.0.1:5000 and sign in using the configured credentials. Keep `SECRET_KEY` stable across restarts. Set `COOKIE_SECURE=1` only when served over HTTPS. The built-in Flask server is for local demonstration; use a production WSGI server and HTTPS for network use.
 
 The default database path is `attendance.db` beside `app.py`. Startup performs additive SQLite migrations and retains existing student and attendance rows. Back up that file before upgrades. A student deactivation removes the identity from future recognition while preserving history.
