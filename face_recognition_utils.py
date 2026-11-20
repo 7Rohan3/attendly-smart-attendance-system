@@ -2,13 +2,19 @@ import base64
 import binascii
 import io
 
-import face_recognition
+import dlib
 import numpy as np
 from PIL import Image, UnidentifiedImageError
+import face_recognition_models
 
 
 class FaceImageError(ValueError):
     pass
+
+
+_face_detector = dlib.get_frontal_face_detector()
+_shape_predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
+_face_encoder = dlib.face_recognition_model_v1(face_recognition_models.face_recognition_model_location())
 
 
 def decode_face_image(value):
@@ -42,15 +48,13 @@ def decode_face_image(value):
 
 
 def encode_face(image):
-    locations = face_recognition.face_locations(image, model="hog")
+    locations, _scores, _indices = _face_detector.run(image, 1, 0)
     if not locations:
         raise FaceImageError("No face was found. Face the camera and try again.")
     if len(locations) != 1:
         raise FaceImageError("Only one face should be visible in the image.")
-    encodings = face_recognition.face_encodings(image, known_face_locations=locations)
-    if not encodings:
-        raise FaceImageError("The face could not be read clearly. Try again in better lighting.")
-    return np.asarray(encodings[0], dtype=np.float64)
+    shape = _shape_predictor(image, locations[0])
+    return np.asarray(_face_encoder.compute_face_descriptor(image, shape), dtype=np.float64)
 
 
 def find_match(encoding, students, threshold=0.48):
@@ -62,7 +66,7 @@ def find_match_with_distance(encoding, students, threshold=0.48):
     if not students:
         return None
     known_encodings = [student[2] for student in students]
-    distances = face_recognition.face_distance(known_encodings, encoding)
+    distances = np.linalg.norm(np.asarray(known_encodings, dtype=np.float64) - encoding, axis=1)
     best_index = int(np.argmin(distances))
     if float(distances[best_index]) > threshold:
         return None
